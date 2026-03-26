@@ -1,76 +1,90 @@
+
 import java.util.*;
-import java.util.stream.Collectors;
 
-// Represents the core Reservation (Simplified for UC8)
-class Reservation {
-    private String reservationId;
-    private String guestName;
-    private double totalAmount;
+// Booking Class
+class Booking {
+    int bookingId;
+    String guestName;
+    String roomType;
+    int roomId;
+    boolean isActive;
 
-    public Reservation(String reservationId, String guestName, double totalAmount) {
-        this.reservationId = reservationId;
+    Booking(int bookingId, String guestName, String roomType, int roomId) {
+        this.bookingId = bookingId;
         this.guestName = guestName;
-        this.totalAmount = totalAmount;
-    }
-
-    public String getReservationId() { return reservationId; }
-    public String getGuestName() { return guestName; }
-    public double getTotalAmount() { return totalAmount; }
-
-    @Override
-    public String toString() {
-        return String.format("ID: %s | Guest: %s | Paid: $%.2f",
-                reservationId, guestName, totalAmount);
+        this.roomType = roomType;
+        this.roomId = roomId;
+        this.isActive = true;
     }
 }
 
-// Manages the historical records (The "Persistence Layer")
-class BookingHistory {
-    private List<Reservation> history = new ArrayList<>();
+// Inventory Class
+class Inventory {
+    static Map<String, Integer> rooms = new HashMap<>();
 
-    public void recordBooking(Reservation res) {
-        history.add(res); // Maintains insertion order
+    static {
+        rooms.put("Single", 5);
+        rooms.put("Double", 3);
     }
 
-    public List<Reservation> getAllBookings() {
-        return new ArrayList<>(history); // Return copy to protect internal state
-    }
-}
-
-// Handles data analysis (The "Business Intelligence Layer")
-class BookingReportService {
-    public void generateSummary(BookingHistory history) {
-        List<Reservation> records = history.getAllBookings();
-
-        double totalRevenue = records.stream()
-                .mapToDouble(Reservation::getTotalAmount)
-                .sum();
-
-        System.out.println("======= OPERATIONAL REPORT =======");
-        System.out.println("Total Bookings Processed: " + records.size());
-        System.out.println("Total Revenue Generated: $" + totalRevenue);
-        System.out.println("==================================");
-    }
-
-    public void listDetailedHistory(BookingHistory history) {
-        System.out.println("Full Audit Trail (Chronological):");
-        history.getAllBookings().forEach(System.out::println);
+    static void increment(String roomType) {
+        rooms.put(roomType, rooms.getOrDefault(roomType, 0) + 1);
     }
 }
 
-public class UC8 {
+// Custom Exception
+class CancellationException extends Exception {
+    CancellationException(String msg) {
+        super(msg);
+    }
+}
+
+// Cancellation Service
+class CancellationService {
+
+    static List<Integer> rollbackLog = new ArrayList<>();
+
+    static void cancelBooking(Booking booking) throws CancellationException {
+
+        // Validate booking
+        if (booking == null || !booking.isActive) {
+            throw new CancellationException("Booking not found or already cancelled.");
+        }
+
+        // Record rollback data
+        rollbackLog.add(booking.roomId);
+
+        // Restore inventory
+        Inventory.increment(booking.roomType);
+
+        // Update booking status
+        booking.isActive = false;
+
+        // Update history (simple print simulation)
+        System.out.println("Booking ID " + booking.bookingId + " cancelled successfully.");
+    }
+}
+
+// Main Class
+public class UC10 {
+
     public static void main(String[] args) {
-        BookingHistory history = new BookingHistory();
-        BookingReportService reportService = new BookingReportService();
 
-        // Simulate Flow: 1. Bookings are confirmed and added to history
-        history.recordBooking(new Reservation("R001", "Alice Smith", 250.00));
-        history.recordBooking(new Reservation("R002", "Bob Jones", 120.50));
-        history.recordBooking(new Reservation("R003", "Charlie Brown", 400.00));
+        // Existing booking
+        Booking booking = new Booking(101, "John", "Single", 1);
 
-        // Simulate Flow: 2. Admin requests reports
-        reportService.listDetailedHistory(history);
-        System.out.println();
-        reportService.generateSummary(history);
+        try {
+            // Guest initiates cancellation
+            CancellationService.cancelBooking(booking);
+
+            // Show updated inventory
+            System.out.println("Updated Inventory: " + Inventory.rooms);
+
+        } catch (CancellationException e) {
+            System.out.println("Cancellation Failed: " + e.getMessage());
+        }
+
+        // System continues safely
+        System.out.println("System running normally...");
     }
 }
